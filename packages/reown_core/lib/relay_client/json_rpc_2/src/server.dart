@@ -29,6 +29,9 @@ typedef ErrorCallback = void Function(dynamic error, dynamic stackTrace);
 /// time, or even for a single method to be invoked multiple times at once.
 class Server {
   final StreamChannel<dynamic> _channel;
+  late final _channelStreamController = StreamController<dynamic>.broadcast()
+    ..addStream(_channel.stream);
+  final _channelSubscriptions = <StreamSubscription<dynamic>>{};
 
   /// The methods registered for this server.
   final _methods = <String, Function>{};
@@ -113,12 +116,22 @@ class Server {
   ///
   /// [listen] may only be called once.
   Future listen() {
-    _channel.stream.listen(_handleRequest, onError: (error, stackTrace) {
-      _done.completeError(error, stackTrace);
-      _channel.sink.close();
-    }, onDone: () {
-      if (!_done.isCompleted) _done.complete();
-    });
+    late final StreamSubscription<dynamic> subscription;
+    subscription = _channelStreamController.stream.listen(
+      _handleRequest,
+      onError: (error, stackTrace) {
+        _done.completeError(error, stackTrace);
+        _channel.sink.close();
+      },
+      onDone: () {
+        if (!_done.isCompleted) {
+          _done.complete();
+        }
+        subscription.cancel();
+        _channelSubscriptions.remove(subscription);
+      },
+    );
+    _channelSubscriptions.add(subscription);
     return done;
   }
 
@@ -129,6 +142,7 @@ class Server {
   Future close() {
     _channel.sink.close();
     if (!_done.isCompleted) _done.complete();
+    _channelStreamController.close();
     return done;
   }
 

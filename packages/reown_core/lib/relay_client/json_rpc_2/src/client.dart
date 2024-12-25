@@ -17,6 +17,9 @@ import 'utils.dart';
 /// [sendNotification] if no response is expected.
 class Client {
   final StreamChannel<dynamic> _channel;
+  late final _channelStreamController = StreamController<dynamic>.broadcast()
+    ..addStream(_channel.stream);
+  final _channelSubscriptions = <StreamSubscription<dynamic>>{};
 
   /// The next request id.
   var _id = 0;
@@ -80,13 +83,22 @@ class Client {
   ///
   /// [listen] may only be called once.
   Future listen() {
-    _channel.stream.listen(_handleResponse, onError: (error, stackTrace) {
-      _done.completeError(error, stackTrace);
-      _channel.sink.close();
-    }, onDone: () {
-      if (!_done.isCompleted) _done.complete();
-      close();
-    });
+    late final StreamSubscription<dynamic> subscription;
+    subscription = _channelStreamController.stream.listen(
+      _handleResponse,
+      onError: (error, stackTrace) {
+        _done.completeError(error, stackTrace);
+        _channel.sink.close();
+      },
+      onDone: () {
+        if (!_done.isCompleted) {
+          _done.complete();
+        }
+        subscription.cancel();
+        _channelSubscriptions.remove(subscription);
+        close();
+      },
+    );
     return done;
   }
 

@@ -18,6 +18,9 @@ import 'utils.dart';
 /// communication channel and expects to connect to a peer that does the same.
 class Peer implements Client, Server {
   final StreamChannel<dynamic> _channel;
+  late final _channelStreamController = StreamController<dynamic>.broadcast()
+    ..addStream(_channel.stream);
+  final _channelSubscriptions = <StreamSubscription<dynamic>>{};
 
   /// The underlying client that handles request-sending and response-receiving
   /// logic.
@@ -120,7 +123,8 @@ class Peer implements Client, Server {
   Future listen() {
     _client.listen();
     _server.listen();
-    _channel.stream.listen((message) {
+    late final StreamSubscription<dynamic> subscription;
+    subscription = _channelStreamController.stream.listen((message) {
       if (message is Map) {
         if (message.containsKey('result') || message.containsKey('error')) {
           _clientIncomingForwarder.add(message);
@@ -143,7 +147,12 @@ class Peer implements Client, Server {
       }
     }, onError: (error, stackTrace) {
       _serverIncomingForwarder.addError(error, stackTrace);
-    }, onDone: close);
+    }, onDone: () {
+      close();
+      subscription.cancel();
+      _channelSubscriptions.remove(subscription);
+    });
+    _channelSubscriptions.add(subscription);
     return done;
   }
 
@@ -151,6 +160,7 @@ class Peer implements Client, Server {
   Future close() {
     _client.close();
     _server.close();
+    _channelStreamController.close();
     return done;
   }
 }
