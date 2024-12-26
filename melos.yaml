@@ -1,0 +1,12 @@
+name: reown_flutter_workspace
+
+packages:
+  - 'packages/*'
+  - 'packages/**/example'
+  - 'packages/reown_appkit/example/**'
+  - 'packages/reown_walletkit/example/packages/**'
+
+ide:
+  intellij:
+    enabled: false
+    moduleNamePrefix: ''
