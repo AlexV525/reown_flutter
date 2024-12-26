@@ -131,7 +131,7 @@ class Client {
 
     var completer = Completer.sync();
     _pendingRequests[idAct] = _Request(method, completer, Chain.current());
-    return completer.future;
+    return completer.future.timeout(const Duration(seconds: 5));
   }
 
   /// Sends a JSON-RPC 2 request to invoke the given [method] without expecting
